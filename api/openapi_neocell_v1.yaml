@@ -1,0 +1,48 @@
+openapi: 3.0.3
+info:
+  title: NeoCell API
+  version: 1.0.0
+servers:
+  - url: /api/v1/neocell
+paths:
+  /deployments:
+    get:
+      summary: List deployments
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create deployment
+      responses:
+        '201':
+          description: Created
+  /modules:
+    get:
+      summary: List modules
+      responses:
+        '200':
+          description: OK
+  /gateways:
+    get:
+      summary: List gateways
+      responses:
+        '200':
+          description: OK
+  /sensor-nodes:
+    get:
+      summary: List sensor nodes
+      responses:
+        '200':
+          description: OK
+  /maintenance:
+    get:
+      summary: List maintenance events
+      responses:
+        '200':
+          description: OK
+  /digital-twin/sync:
+    post:
+      summary: Sync with NOVA Twin
+      responses:
+        '202':
+          description: Accepted
