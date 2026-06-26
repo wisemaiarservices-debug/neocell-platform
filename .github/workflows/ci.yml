@@ -43,3 +43,23 @@ jobs:
           sleep 3
           curl -fsS http://127.0.0.1:8300/health
           curl -fsS http://127.0.0.1:8300/api/v1/dashboard/summary
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        working-directory: apps/web
+        run: pnpm install
+      - name: Typecheck
+        working-directory: apps/web
+        run: pnpm run typecheck
+      - name: Build
+        working-directory: apps/web
+        run: pnpm run build
