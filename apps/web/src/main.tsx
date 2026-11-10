@@ -34,19 +34,19 @@ function App() {
   }, []);
   const go = (to: string) => { history.pushState({}, "", to); setPath(to); };
   const Page = pages[path] ?? Overview;
-  const live = api === "ok";
+  const apiReachable = api === "ok";
   return <div className="min-h-screen flex bg-background text-foreground">
     <aside className="hidden md:flex w-56 flex-col border-r border-border bg-panel">
-      <div className="p-4 border-b border-border"><b>NeoCell</b><div className="text-xs text-muted-foreground">NOVA Infrastructure</div><Chip text={live ? "API live" : "Fallback demo"} tone={live ? "good" : "warn"} /></div>
+      <div className="p-4 border-b border-border"><b>NeoCell</b><div className="text-xs text-muted-foreground">NOVA Infrastructure</div><Chip text={apiReachable ? "API reachable" : "Demo mode"} tone={apiReachable ? "good" : "warn"} /></div>
       <nav className="p-2 flex-1">{nav.map(([to, label, Icon]) => <button key={to} onClick={() => go(to)} className={`nav ${path === to ? "active" : ""}`}><Icon size={16}/>{label}</button>)}</nav>
       <div className="p-3 border-t border-border text-[11px] text-muted-foreground">Operator approval required.<br/>No autonomous physical control.</div>
     </aside>
     <main className="flex-1 min-w-0">
       <header className="border-b border-border bg-panel/80">
-        <div className="h-12 px-4 flex items-center gap-3"><Activity size={16} className="text-[var(--neo-green)]"/><b>SolarHub Agrivoltaic Demo Site</b><span className="text-xs text-muted-foreground hidden lg:inline">NHV-SH-01 / Heatwave infrastructure readiness</span><span className="ml-auto text-xs"><Radio size={13} className="inline mr-1"/>{live ? `API live: ${API}` : "Fallback demo - API-ready"}</span><ShieldCheck size={15}/></div>
+        <div className="h-12 px-4 flex items-center gap-3"><Activity size={16} className="text-[var(--neo-green)]"/><b>SolarHub Agrivoltaic Demo Site</b><span className="text-xs text-muted-foreground hidden lg:inline">NHV-SH-01 / Heatwave infrastructure readiness</span><span className="ml-auto text-xs"><Radio size={13} className="inline mr-1"/>{apiReachable ? "API health reachable · telemetry unverified" : "Demo fixtures · no API connection"}</span><ShieldCheck size={15}/></div>
         <div className="px-4 pb-3 flex gap-2 overflow-x-auto">{metrics.map(([a,b,t]) => <Chip key={a} text={`${a}: ${b}`} tone={t}/>)}</div>
       </header>
-      <div className="p-4 lg:p-6 space-y-5"><Page /></div>
+      <div className="p-4 lg:p-6 space-y-5"><div role="status" className="rounded-lg border border-amber-500/30 bg-amber-950/20 px-4 py-3 text-xs leading-5 text-amber-200"><b>Illustrative demo workspace.</b> The displayed readiness, gateway, sensor, latency, pump and alarm values are static sample fixtures, not live field telemetry. A successful API health check confirms service reachability only; it does not verify sensor data, timestamps, calibration or device connectivity.</div><Page /></div>
     </main>
   </div>;
 }
