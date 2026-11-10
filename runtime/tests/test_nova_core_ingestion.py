@@ -70,6 +70,16 @@ class NeoCellIngestionTests(unittest.TestCase):
         self.assertEqual(result["verification_status"], "unverified")
         self.assertTrue(FakeConnection.last.closed)
 
+
+    def test_rejects_oversized_or_non_json_payload_before_network_call(self):
+        FakeConnection.last = None
+        with self.assertRaisesRegex(NovaCoreIngestionError, "payload_too_large"):
+            submit_observation({**self.payload, "extra": "x" * 33_000}, environ=self.env, connection_factory=FakeConnection)
+        self.assertIsNone(FakeConnection.last)
+        with self.assertRaisesRegex(NovaCoreIngestionError, "payload_invalid"):
+            submit_observation({**self.payload, "value": float("nan")}, environ=self.env, connection_factory=FakeConnection)
+        self.assertIsNone(FakeConnection.last)
+
     def test_missing_credentials_fail_closed(self):
         env = dict(self.env)
         env.pop("NOVA_CORE_ACCESS_CLIENT_SECRET")
