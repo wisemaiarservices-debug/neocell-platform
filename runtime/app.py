@@ -10,9 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class CellState(BaseModel):
-    """Input contract. Defaults are synthetic fixtures, never device telemetry."""
+    """Input contract; omitted measurements stay unknown and are never device telemetry."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     site_id: str | None = None
     gateway_online_pct: float | None = Field(default=None, ge=0, le=100)
