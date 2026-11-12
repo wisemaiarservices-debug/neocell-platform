@@ -58,7 +58,11 @@ def _validate_observation_payload(payload: dict[str, Any]) -> None:
     if not isinstance(metric, str) or not METRIC_PATTERN.fullmatch(metric):
         raise NovaCoreIngestionError("nova_core_invalid_metric")
     value = payload.get("value")
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    try:
+        finite_value = not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+    except (OverflowError, TypeError, ValueError):
+        finite_value = False
+    if not finite_value:
         raise NovaCoreIngestionError("nova_core_invalid_value")
     unit = payload.get("unit")
     if not isinstance(unit, str) or not UNIT_PATTERN.fullmatch(unit):
