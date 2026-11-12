@@ -42,6 +42,7 @@ class RejectedConnection(FakeConnection):
 class NeoCellIngestionTests(unittest.TestCase):
     def setUp(self):
         self.env = {
+            "NOVA_CORE_INGESTION_ENABLED": "true",
             "NOVA_CORE_INGESTION_URL": "https://nova-core-ingest.example.workers.dev/api/v1/observations",
             "NOVA_CORE_ACCESS_CLIENT_ID": "cell-client-id",
             "NOVA_CORE_ACCESS_CLIENT_SECRET": "cell-client-secret",
@@ -93,6 +94,13 @@ class NeoCellIngestionTests(unittest.TestCase):
         for invalid in invalid_payloads:
             with self.subTest(payload=invalid), self.assertRaises(NovaCoreIngestionError):
                 submit_observation(invalid, environ=self.env, connection_factory=FakeConnection)
+
+    def test_ingestion_disabled_without_explicit_opt_in(self):
+        FakeConnection.last = None
+        env = dict(self.env, NOVA_CORE_INGESTION_ENABLED="false")
+        with self.assertRaisesRegex(NovaCoreIngestionError, "ingestion_disabled"):
+            submit_observation(self.payload, environ=env, connection_factory=FakeConnection)
+        self.assertIsNone(FakeConnection.last)
 
     def test_missing_credentials_fail_closed(self):
         env = dict(self.env)
