@@ -60,23 +60,25 @@ def now_iso() -> str:
 
 
 def input_provenance(state: CellState) -> dict[str, Any]:
+    measurement_fields = set(type(state).model_fields) - {"site_id"}
     provided = sorted(state.model_fields_set)
-    defaulted = sorted(set(type(state).model_fields) - set(provided))
-    mode = "caller_supplied_unverified" if provided else "insufficient_inputs"
+    provided_measurements = sorted(measurement_fields.intersection(state.model_fields_set))
+    missing_measurements = sorted(measurement_fields - set(provided_measurements))
+    mode = "caller_supplied_unverified" if provided_measurements else "insufficient_inputs"
     return {
         "data_mode": mode,
         "provided_fields": provided,
+        "provided_measurement_fields": provided_measurements,
         "defaulted_fields": [],
-        "missing_fields": sorted(set(type(state).model_fields) - set(provided)),
+        "missing_fields": missing_measurements,
         "synthetic_defaults_present": False,
         "caller_supplied_values_verified": False,
         "note": (
-            "Default values are synthetic demonstration fixtures. Caller-supplied values "
-            "remain unverified until device identity, source, timestamps, units and calibration "
-            "are validated."
+            "No measurement defaults are populated. Caller-supplied values remain "
+            "unverified until source/device identity, timestamps, units and calibration "
+            "are checked."
         ),
     }
-
 
 def methodology() -> dict[str, Any]:
     return {
