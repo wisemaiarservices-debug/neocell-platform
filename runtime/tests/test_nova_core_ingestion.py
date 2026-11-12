@@ -87,7 +87,7 @@ class NeoCellIngestionTests(unittest.TestCase):
             dict(self.payload, value=True),
             dict(self.payload, idempotency_key=""),
             dict(self.payload, site_id="😀" * 61),
-            dict(self.payload, site_id="\\ufeff"),
+            dict(self.payload, site_id="\ufeff"),
             dict(self.payload, unexpected_field="not-accepted"),
             dict(self.payload, provenance={"provider": "test", "acquisition_method": "sensor", "secret": "no"}),
             dict(self.payload, provenance={"provider": "test", "acquisition_method": []}),
