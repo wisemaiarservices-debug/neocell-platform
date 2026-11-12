@@ -63,6 +63,12 @@ def test_recommendation_is_review_only_without_confidence_or_impact():
     assert rec["expected_impact"]["data_reliability_gain_pct"] is None
 
 
+def test_non_finite_measurements_are_rejected():
+    for value in (float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(ValueError):
+            CellState(temperature_c=value)
+
+
 def test_input_bounds_and_extra_fields_are_rejected():
     with pytest.raises(ValueError):
         CellState(gateway_online_pct=140)
