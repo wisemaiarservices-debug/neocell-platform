@@ -3,18 +3,24 @@ import pytest
 from runtime.app import CellState, analyze, input_provenance, plan, recommend, summary
 
 
-def test_default_inputs_are_explicitly_synthetic():
-    provenance = input_provenance(CellState())
-    assert provenance["data_mode"] == "synthetic_defaults"
-    assert provenance["synthetic_defaults_present"] is True
-    assert provenance["caller_supplied_values_verified"] is False
+def test_empty_inputs_do_not_create_synthetic_site_or_device_measurements():
+    state = CellState()
+    provenance = input_provenance(state)
+    assert state.site_id is None
+    assert state.gateway_online_pct is None
+    assert provenance["data_mode"] == "insufficient_inputs"
+    assert provenance["defaulted_fields"] == []
+    assert provenance["synthetic_defaults_present"] is False
+    assert "gateway_online_pct" in provenance["missing_fields"]
 
 
-def test_partial_caller_inputs_remain_unverified_and_report_defaults():
-    provenance = input_provenance(CellState(gateway_online_pct=80))
-    assert provenance["data_mode"] == "mixed_synthetic_and_caller_supplied"
+def test_partial_caller_inputs_remain_unverified_without_filling_other_fields():
+    state = CellState(gateway_online_pct=80)
+    provenance = input_provenance(state)
+    assert provenance["data_mode"] == "caller_supplied_unverified"
     assert "gateway_online_pct" in provenance["provided_fields"]
-    assert "sensor_online_pct" in provenance["defaulted_fields"]
+    assert "sensor_online_pct" in provenance["missing_fields"]
+    assert state.sensor_online_pct is None
 
 
 def test_summary_does_not_publish_unvalidated_readiness_score():
