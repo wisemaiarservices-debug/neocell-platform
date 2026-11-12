@@ -75,6 +75,23 @@ class NeoCellIngestionTests(unittest.TestCase):
             with self.subTest(payload_type=type(invalid).__name__), self.assertRaises(NovaCoreIngestionError):
                 submit_observation(invalid, environ=self.env, connection_factory=FakeConnection)
 
+    def test_core_v1_envelope_is_validated_before_network_request(self):
+        invalid_payloads = (
+            dict(self.payload, module="another-module"),
+            dict(self.payload, metric="Invalid Metric"),
+            dict(self.payload, unit=""),
+            dict(self.payload, observed_at="2026-11-10T12:00:00"),
+            dict(self.payload, observed_at="2099-11-10T12:00:00Z"),
+            dict(self.payload, value=True),
+            dict(self.payload, idempotency_key=""),
+            dict(self.payload, unexpected_field="not-accepted"),
+            dict(self.payload, provenance={"provider": "test", "acquisition_method": "sensor", "secret": "no"}),
+            dict(self.payload, quality_flags=["unknown_flag"]),
+        )
+        for invalid in invalid_payloads:
+            with self.subTest(payload=invalid), self.assertRaises(NovaCoreIngestionError):
+                submit_observation(invalid, environ=self.env, connection_factory=FakeConnection)
+
     def test_missing_credentials_fail_closed(self):
         env = dict(self.env)
         env.pop("NOVA_CORE_ACCESS_CLIENT_SECRET")
