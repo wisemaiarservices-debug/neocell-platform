@@ -1,41 +1,57 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CellState(BaseModel):
-    site_id: str = "site-solarhub-agro-001"
-    gateway_online_pct: float = 94
-    sensor_online_pct: float = 89
-    battery_node_soc_pct: float = 72
-    data_latency_ms: float = 420
-    temperature_c: float = 39
-    dust_risk_pct: float = 36
-    pump_node_health_pct: float = 88
-    water_node_health_pct: float = 91
+    """Input contract; omitted measurements stay unknown and are never device telemetry."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    site_id: str | None = None
+    gateway_online_pct: float | None = Field(default=None, ge=0, le=100)
+    sensor_online_pct: float | None = Field(default=None, ge=0, le=100)
+    battery_node_soc_pct: float | None = Field(default=None, ge=0, le=100)
+    data_latency_ms: float | None = Field(default=None, ge=0, le=600000)
+    temperature_c: float | None = Field(default=None, ge=-80, le=85)
+    dust_risk_pct: float | None = Field(default=None, ge=0, le=100)
+    pump_node_health_pct: float | None = Field(default=None, ge=0, le=100)
+    water_node_health_pct: float | None = Field(default=None, ge=0, le=100)
 
 
 class CellRecommendation(BaseModel):
     id: str
     title: str
     priority: str
-    confidence: float = Field(ge=0, le=1)
+    confidence: float | None = None
     explanation: str
     expected_impact: dict[str, Any]
-    status: str = "operator_review"
+    status: str = "review_required"
+    requires_operator_review: bool = True
 
 
-app = FastAPI(title="NeoCell API", version="0.1.0")
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "NEOCELL_ALLOWED_ORIGINS",
+        "http://localhost:8400,http://localhost:8504,http://127.0.0.1:8504",
+    ).split(",")
+    if origin.strip()
+]
+
+app = FastAPI(title="NeoCell API", version="0.2.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Accept", "Content-Type"],
 )
 
 
@@ -43,87 +59,128 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def readiness_score(state: CellState) -> int:
-    score = (
-        state.gateway_online_pct * 0.25
-        + state.sensor_online_pct * 0.25
-        + state.battery_node_soc_pct * 0.15
-        + state.pump_node_health_pct * 0.15
-        + state.water_node_health_pct * 0.20
-    )
-    latency_penalty = 4 if state.data_latency_ms > 500 else 0
-    heat_penalty = 3 if state.temperature_c >= 38 else 0
-    return max(0, min(100, round(score - latency_penalty - heat_penalty)))
+def input_provenance(state: CellState) -> dict[str, Any]:
+    measurement_fields = set(type(state).model_fields) - {"site_id"}
+    provided = sorted(state.model_fields_set)
+    provided_measurements = sorted(measurement_fields.intersection(state.model_fields_set))
+    missing_measurements = sorted(measurement_fields - set(provided_measurements))
+    mode = "caller_supplied_unverified" if provided_measurements else "insufficient_inputs"
+    return {
+        "data_mode": mode,
+        "provided_fields": provided,
+        "provided_measurement_fields": provided_measurements,
+        "defaulted_fields": [],
+        "missing_fields": missing_measurements,
+        "synthetic_defaults_present": False,
+        "caller_supplied_values_verified": False,
+        "note": (
+            "No measurement defaults are populated. Caller-supplied values remain "
+            "unverified until source/device identity, timestamps, units and calibration "
+            "are checked."
+        ),
+    }
+
+def methodology() -> dict[str, Any]:
+    return {
+        "type": "input_contract_and_provenance_only",
+        "version": "neocell-readiness-screening-v0.2",
+        "calibrated_readiness_model": False,
+        "trained_machine_learning": False,
+        "live_device_telemetry": False,
+        "automated_control": False,
+        "limitations": [
+            "No authenticated gateway or sensor feed is connected.",
+            "No commissioned asset inventory or site-specific baseline is available.",
+            "No validated reliability, heat, dust or battery health model is available.",
+            "No maintenance action, expected benefit or downtime reduction is estimated.",
+            "All operational decisions require qualified human review.",
+        ],
+    }
 
 
-def summary(state: CellState = CellState()) -> dict[str, Any]:
+def metadata(state: CellState) -> dict[str, Any]:
+    return {
+        "input_provenance": input_provenance(state),
+        "methodology": methodology(),
+        "requires_operator_review": True,
+    }
+
+
+def summary(state: CellState) -> dict[str, Any]:
     return {
         "site_id": state.site_id,
-        "scenario": "SolarHub site readiness and edge telemetry",
-        "readiness_score": readiness_score(state),
+        "scenario": "NeoCell input contract · no assumed site or device measurements",
+        "readiness_score": None,
+        "readiness_status": "not_assessed",
         "kpis": [
-            {"label": "Gateway Online", "value": state.gateway_online_pct, "unit": "%", "trend": "stable"},
-            {"label": "Sensor Online", "value": state.sensor_online_pct, "unit": "%", "trend": "up"},
-            {"label": "Node Battery", "value": state.battery_node_soc_pct, "unit": "%", "trend": "stable"},
-            {"label": "Data Latency", "value": state.data_latency_ms, "unit": "ms", "trend": "down"},
-            {"label": "Pump Node", "value": state.pump_node_health_pct, "unit": "%", "trend": "stable"},
-            {"label": "Water Node", "value": state.water_node_health_pct, "unit": "%", "trend": "up"},
+            {"label": "Gateway online input", "value": state.gateway_online_pct, "unit": "%", "interpretation": "unverified input"},
+            {"label": "Sensor online input", "value": state.sensor_online_pct, "unit": "%", "interpretation": "unverified input"},
+            {"label": "Edge battery input", "value": state.battery_node_soc_pct, "unit": "%", "interpretation": "unverified input"},
+            {"label": "Data latency input", "value": state.data_latency_ms, "unit": "ms", "interpretation": "unverified input"},
+            {"label": "Temperature input", "value": state.temperature_c, "unit": "°C", "interpretation": "unverified input"},
+            {"label": "Dust risk input", "value": state.dust_risk_pct, "unit": "%", "interpretation": "unverified input"},
         ],
         "generated_at": now_iso(),
+        **metadata(state),
     }
 
 
 def analyze(state: CellState) -> dict[str, Any]:
     return {
         "site_id": state.site_id,
-        "readiness_score": readiness_score(state),
-        "heat_exposure": "high" if state.temperature_c >= 38 else "medium",
-        "dust_exposure": "medium_high" if state.dust_risk_pct >= 35 else "medium",
-        "data_quality": "good" if state.sensor_online_pct >= 85 and state.data_latency_ms <= 600 else "needs_attention",
-        "edge_power_status": "good" if state.battery_node_soc_pct >= 60 else "watch",
+        "status": "not_assessed",
+        "readiness_score": None,
+        "heat_exposure": None,
+        "dust_exposure": None,
+        "data_quality": "unverified",
+        "reason": "Validated telemetry, asset metadata, timestamps, calibration and site-specific thresholds are required.",
         "generated_at": now_iso(),
+        **metadata(state),
     }
 
 
 def plan(state: CellState) -> dict[str, Any]:
     return {
         "site_id": state.site_id,
-        "plan": "pre_heatwave_readiness_check",
-        "actions": [
-            "Confirm gateway uplink before the heat window",
-            "Prioritize soil and water node checks",
-            "Keep edge battery reserve above 60 percent",
-            "Schedule pump node inspection before irrigation shift",
-        ],
-        "expected_data_reliability_gain_pct": 8,
-        "expected_downtime_risk_reduction_pct": 12,
-        "expected_response_time_gain_pct": 10,
+        "status": "not_estimable_from_available_inputs",
+        "plan": None,
+        "actions": [],
+        "expected_data_reliability_gain_pct": None,
+        "expected_downtime_risk_reduction_pct": None,
+        "expected_response_time_gain_pct": None,
+        "reason": "No verified device inventory, maintenance history, operating limits or validated intervention evidence is connected.",
         "generated_at": now_iso(),
+        **metadata(state),
     }
 
 
 def recommend(state: CellState) -> CellRecommendation:
     return CellRecommendation(
-        id="neocell-rec-readiness-001",
-        title="Run pre-heatwave site readiness check",
-        priority="high" if state.temperature_c >= 38 else "medium",
-        confidence=0.82,
+        id="neocell-review-verify-telemetry-001",
+        title="Verify gateway, sensor and asset records before readiness assessment",
+        priority="review_required",
+        confidence=None,
         explanation=(
-            "NeoCell detects high heat exposure with elevated field activity. A readiness check improves telemetry quality "
-            "before irrigation and energy coordination decisions are made."
+            "NeoCell has no authenticated field telemetry or validated readiness model. "
+            "The next safe step is to verify device identity, timestamps, units, calibration "
+            "and commissioned asset records."
         ),
         expected_impact={
-            "data_reliability_gain_pct": 8,
-            "downtime_risk_reduction_pct": 12,
-            "response_time_gain_pct": 10,
-            "readiness_score_after_action": min(100, readiness_score(state) + 7),
+            "data_reliability_gain_pct": None,
+            "downtime_risk_reduction_pct": None,
+            "response_time_gain_pct": None,
         },
     )
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "neocell-api", "time": now_iso()}
+    return {
+        "status": "ok",
+        "service": "neocell-api",
+        "mode": "decision_support_only",
+        "time": now_iso(),
+    }
 
 
 @app.get("/api/v1/dashboard/summary")
@@ -149,4 +206,9 @@ def run_plan(state: CellState) -> dict[str, Any]:
 
 @app.post("/api/v1/recommendations/run")
 def run_recommendations(state: CellState) -> dict[str, Any]:
-    return {"status": "completed", "recommendations": [recommend(state).model_dump()], "generated_at": now_iso()}
+    return {
+        "status": "review_required",
+        "recommendations": [recommend(state).model_dump()],
+        "generated_at": now_iso(),
+        **metadata(state),
+    }
