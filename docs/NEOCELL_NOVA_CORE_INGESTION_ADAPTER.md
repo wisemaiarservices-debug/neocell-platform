@@ -15,7 +15,7 @@ telemetry is connected.
 - NOVA Core remains authoritative for Access JWT verification, service/module/
   source grants, payload validation, ownership, idempotency, audit records and
   server-assigned \`unverified\` status.
-- Synthetic demo values must never be forwarded as observations.
+- Synthetic demo values must never be forwarded as observations. The helper validates the strict Core v1 envelope and requires explicit opt-in; NOVA Core derives tenant ownership from registered site/source/asset records. The producer must not send a tenant ID.
 
 ## Server environment
 
