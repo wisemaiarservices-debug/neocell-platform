@@ -35,7 +35,7 @@ PROVENANCE_KEYS = {"provider", "acquisition_method", "source_record_ref"}
 METRIC_PATTERN = re.compile(r"^[a-z][a-z0-9_.-]{0,119}$")
 UNIT_PATTERN = re.compile(r"^[A-Za-z0-9%°µμ/._ -]{1,48}$")
 RFC3339_PATTERN = re.compile(
-    r"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"
 )
 
 
