@@ -13,6 +13,100 @@ from typing import Any, Callable
 from urllib.parse import urlsplit
 
 
+MAX_REQUEST_BYTES = 32_768
+
+
+import math
+import re
+from datetime import datetime, timedelta, timezone
+
+EXPECTED_MODULE = "neocell"
+MODULES = {"nova-core", "neoagro", "neogrid", "neocell"}
+METHODS = {"sensor", "manual", "provider_api", "satellite", "model", "derived"}
+QUALITY_FLAGS = {
+    "estimated", "sensor_calibration_due", "sensor_fault", "outlier_suspected",
+    "provider_fill_value", "manually_entered", "gridded_or_reanalysis", "time_alignment_uncertain",
+}
+TOP_LEVEL_KEYS = {
+    "site_id", "asset_id", "source_id", "module", "metric", "value", "unit",
+    "observed_at", "idempotency_key", "provenance", "quality_flags",
+}
+PROVENANCE_KEYS = {"provider", "acquisition_method", "source_record_ref"}
+METRIC_PATTERN = re.compile(r"^[a-z][a-z0-9_.-]{0,119}$")
+UNIT_PATTERN = re.compile(r"^[A-Za-z0-9%°µμ/._ -]{1,48}$")
+RFC3339_PATTERN = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"
+)
+
+
+ECMASCRIPT_TRIM_CHARS = "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
+
+
+def _required_string(value: Any, maximum: int, field: str) -> None:
+    utf16_length = len(value.encode("utf-16-le", errors="surrogatepass")) // 2 if isinstance(value, str) else 0
+    trimmed = value.strip(ECMASCRIPT_TRIM_CHARS) if isinstance(value, str) else ""
+    if not isinstance(value, str) or not trimmed or trimmed != value or utf16_length > maximum:
+        raise NovaCoreIngestionError("nova_core_invalid_" + field)
+
+
+def _validate_observation_payload(payload: dict[str, Any]) -> None:
+    """Mirror Core's v1 envelope checks; Core remains the authority."""
+    if not isinstance(payload, dict) or not set(payload).issubset(TOP_LEVEL_KEYS):
+        raise NovaCoreIngestionError("nova_core_invalid_payload_shape")
+    for field in ("site_id", "source_id", "idempotency_key"):
+        _required_string(payload.get(field), {"site_id": 120, "source_id": 120, "idempotency_key": 200}[field], field)
+    if payload.get("asset_id") is not None:
+        _required_string(payload["asset_id"], 120, "asset_id")
+    module = payload.get("module")
+    if not isinstance(module, str) or module != EXPECTED_MODULE or module not in MODULES:
+        raise NovaCoreIngestionError("nova_core_invalid_module")
+    metric = payload.get("metric")
+    if not isinstance(metric, str) or not METRIC_PATTERN.fullmatch(metric):
+        raise NovaCoreIngestionError("nova_core_invalid_metric")
+    value = payload.get("value")
+    try:
+        finite_value = not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+        if finite_value and isinstance(value, int):
+            finite_value = abs(value) <= 9_007_199_254_740_991
+        elif finite_value and isinstance(value, float) and value.is_integer():
+            finite_value = abs(value) <= 9_007_199_254_740_991
+    except (OverflowError, TypeError, ValueError):
+        finite_value = False
+    if not finite_value:
+        raise NovaCoreIngestionError("nova_core_invalid_value")
+    unit = payload.get("unit")
+    if not isinstance(unit, str) or not UNIT_PATTERN.fullmatch(unit):
+        raise NovaCoreIngestionError("nova_core_invalid_unit")
+    observed_at = payload.get("observed_at")
+    if not isinstance(observed_at, str) or not RFC3339_PATTERN.fullmatch(observed_at):
+        raise NovaCoreIngestionError("nova_core_invalid_observed_at")
+    try:
+        parsed = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError("timezone_required")
+        if parsed > datetime.now(timezone.utc) + timedelta(minutes=5):
+            raise ValueError("future_timestamp")
+    except ValueError as exc:
+        raise NovaCoreIngestionError("nova_core_invalid_observed_at") from exc
+    provenance = payload.get("provenance")
+    if not isinstance(provenance, dict) or not set(provenance).issubset(PROVENANCE_KEYS):
+        raise NovaCoreIngestionError("nova_core_invalid_provenance")
+    _required_string(provenance.get("provider"), 120, "provenance_provider")
+    acquisition_method = provenance.get("acquisition_method")
+    if not isinstance(acquisition_method, str) or acquisition_method not in METHODS:
+        raise NovaCoreIngestionError("nova_core_invalid_acquisition_method")
+    if provenance.get("source_record_ref") is not None:
+        _required_string(provenance["source_record_ref"], 240, "source_record_ref")
+    flags = payload.get("quality_flags", [])
+    if (
+        not isinstance(flags, list)
+        or len(flags) > 16
+        or any(not isinstance(flag, str) or flag not in QUALITY_FLAGS for flag in flags)
+        or len(set(flags)) != len(flags)
+    ):
+        raise NovaCoreIngestionError("nova_core_invalid_quality_flags")
+
+
 class NovaCoreIngestionError(RuntimeError):
     def __init__(self, code: str, status: int | None = None) -> None:
         self.code = code
@@ -21,6 +115,8 @@ class NovaCoreIngestionError(RuntimeError):
 
 
 def _configuration(environ: dict[str, str]) -> tuple[str, int, str, str, str]:
+    if environ.get("NOVA_CORE_INGESTION_ENABLED", "").strip().lower() != "true":
+        raise NovaCoreIngestionError("nova_core_ingestion_disabled")
     endpoint = environ.get("NOVA_CORE_INGESTION_URL", "").strip()
     client_id = environ.get("NOVA_CORE_ACCESS_CLIENT_ID", "")
     client_secret = environ.get("NOVA_CORE_ACCESS_CLIENT_SECRET", "")
@@ -56,13 +152,12 @@ def submit_observation(
     host, port, path, client_id, client_secret = _configuration(
         dict(os.environ if environ is None else environ)
     )
-    if not isinstance(payload, dict):
-        raise NovaCoreIngestionError("nova_core_payload_invalid")
+    _validate_observation_payload(payload)
     try:
         body = json.dumps(payload, allow_nan=False, separators=(",", ":")).encode("utf-8")
-    except (TypeError, ValueError, UnicodeEncodeError) as exc:
+    except (TypeError, ValueError) as exc:
         raise NovaCoreIngestionError("nova_core_payload_invalid") from exc
-    if len(body) > 32_768:
+    if len(body) > MAX_REQUEST_BYTES:
         raise NovaCoreIngestionError("nova_core_payload_too_large")
     connection = connection_factory(host, port, timeout=10)
     try:
