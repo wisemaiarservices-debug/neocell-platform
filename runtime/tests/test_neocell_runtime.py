@@ -14,6 +14,14 @@ def test_empty_inputs_do_not_create_synthetic_site_or_device_measurements():
     assert "gateway_online_pct" in provenance["missing_fields"]
 
 
+def test_site_identity_alone_is_not_reported_as_device_telemetry():
+    provenance = input_provenance(CellState(site_id="registered-site-001"))
+    assert provenance["data_mode"] == "insufficient_inputs"
+    assert provenance["provided_fields"] == ["site_id"]
+    assert provenance["provided_measurement_fields"] == []
+    assert "gateway_online_pct" in provenance["missing_fields"]
+
+
 def test_partial_caller_inputs_remain_unverified_without_filling_other_fields():
     state = CellState(gateway_online_pct=80)
     provenance = input_provenance(state)
