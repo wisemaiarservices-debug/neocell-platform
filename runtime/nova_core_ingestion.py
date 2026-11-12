@@ -66,6 +66,10 @@ def _validate_observation_payload(payload: dict[str, Any]) -> None:
     value = payload.get("value")
     try:
         finite_value = not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+        if finite_value and isinstance(value, int):
+            finite_value = abs(value) <= 9_007_199_254_740_991
+        elif finite_value and isinstance(value, float) and value.is_integer():
+            finite_value = abs(value) <= 9_007_199_254_740_991
     except (OverflowError, TypeError, ValueError):
         finite_value = False
     if not finite_value:
