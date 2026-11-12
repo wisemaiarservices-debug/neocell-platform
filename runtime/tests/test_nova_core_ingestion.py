@@ -70,6 +70,11 @@ class NeoCellIngestionTests(unittest.TestCase):
         self.assertEqual(result["verification_status"], "unverified")
         self.assertTrue(FakeConnection.last.closed)
 
+    def test_rejects_non_object_non_finite_and_oversized_payloads(self):
+        for invalid in ([], {"value": float("nan")}, {"value": "x" * 33_000}):
+            with self.subTest(payload_type=type(invalid).__name__), self.assertRaises(NovaCoreIngestionError):
+                submit_observation(invalid, environ=self.env, connection_factory=FakeConnection)
+
     def test_missing_credentials_fail_closed(self):
         env = dict(self.env)
         env.pop("NOVA_CORE_ACCESS_CLIENT_SECRET")
