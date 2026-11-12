@@ -53,3 +53,8 @@ The transport helper mirrors NOVA Core's current v1 observation envelope checks 
 - Bounded serialized request body; no credentials in the payload.
 
 This is an early rejection layer, not an authorization or verification mechanism. Core revalidates every request and alone assigns persistence and verification status. Keep this mirror aligned with apps/ingestion-worker/src/observation-contract.mjs in NOVA Core when the contract changes.
+
+
+## Forward compatibility: measurement quality and calibration v2
+
+NOVA Core has a design-only proposal for structured device, sampling, calibration-evidence, uncertainty, method/version and spatial-support metadata in `NOVA_CORE_MEASUREMENT_QUALITY_CALIBRATION_V2_PROPOSAL.md`. This proposal is not accepted by the current v1 endpoint. This adapter intentionally sends only the strict v1 envelope; do not add proposed fields or infer missing calibration/device metadata until a separately versioned Core endpoint and migration are approved and implemented. A successful v1 submission remains unverified and is not evidence of calibration or scientific eligibility.
