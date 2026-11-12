@@ -14,15 +14,15 @@ class CellState(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    site_id: str = "demo-site-neocell-001"
-    gateway_online_pct: float = Field(default=94, ge=0, le=100)
-    sensor_online_pct: float = Field(default=89, ge=0, le=100)
-    battery_node_soc_pct: float = Field(default=72, ge=0, le=100)
-    data_latency_ms: float = Field(default=420, ge=0, le=600000)
-    temperature_c: float = Field(default=39, ge=-80, le=85)
-    dust_risk_pct: float = Field(default=36, ge=0, le=100)
-    pump_node_health_pct: float = Field(default=88, ge=0, le=100)
-    water_node_health_pct: float = Field(default=91, ge=0, le=100)
+    site_id: str | None = None
+    gateway_online_pct: float | None = Field(default=None, ge=0, le=100)
+    sensor_online_pct: float | None = Field(default=None, ge=0, le=100)
+    battery_node_soc_pct: float | None = Field(default=None, ge=0, le=100)
+    data_latency_ms: float | None = Field(default=None, ge=0, le=600000)
+    temperature_c: float | None = Field(default=None, ge=-80, le=85)
+    dust_risk_pct: float | None = Field(default=None, ge=0, le=100)
+    pump_node_health_pct: float | None = Field(default=None, ge=0, le=100)
+    water_node_health_pct: float | None = Field(default=None, ge=0, le=100)
 
 
 class CellRecommendation(BaseModel):
@@ -62,17 +62,13 @@ def now_iso() -> str:
 def input_provenance(state: CellState) -> dict[str, Any]:
     provided = sorted(state.model_fields_set)
     defaulted = sorted(set(type(state).model_fields) - set(provided))
-    if not provided:
-        mode = "synthetic_defaults"
-    elif defaulted:
-        mode = "mixed_synthetic_and_caller_supplied"
-    else:
-        mode = "caller_supplied_unverified"
+    mode = "caller_supplied_unverified" if provided else "insufficient_inputs"
     return {
         "data_mode": mode,
         "provided_fields": provided,
-        "defaulted_fields": defaulted,
-        "synthetic_defaults_present": bool(defaulted),
+        "defaulted_fields": [],
+        "missing_fields": sorted(set(type(state).model_fields) - set(provided)),
+        "synthetic_defaults_present": False,
         "caller_supplied_values_verified": False,
         "note": (
             "Default values are synthetic demonstration fixtures. Caller-supplied values "
@@ -111,7 +107,7 @@ def metadata(state: CellState) -> dict[str, Any]:
 def summary(state: CellState) -> dict[str, Any]:
     return {
         "site_id": state.site_id,
-        "scenario": "NeoCell input contract demonstration",
+        "scenario": "NeoCell input contract · no assumed site or device measurements",
         "readiness_score": None,
         "readiness_status": "not_assessed",
         "kpis": [
