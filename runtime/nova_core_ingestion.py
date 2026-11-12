@@ -39,9 +39,13 @@ RFC3339_PATTERN = re.compile(
 )
 
 
+ECMASCRIPT_TRIM_CHARS = "\\u0009\\u000a\\u000b\\u000c\\u000d\\u0020\\u00a0\\u1680\\u2000\\u2001\\u2002\\u2003\\u2004\\u2005\\u2006\\u2007\\u2008\\u2009\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff"
+
+
 def _required_string(value: Any, maximum: int, field: str) -> None:
     utf16_length = len(value.encode("utf-16-le", errors="surrogatepass")) // 2 if isinstance(value, str) else 0
-    if not isinstance(value, str) or not value.strip() or value.strip() != value or utf16_length > maximum:
+    trimmed = value.strip(ECMASCRIPT_TRIM_CHARS) if isinstance(value, str) else ""
+    if not isinstance(value, str) or not trimmed or trimmed != value or utf16_length > maximum:
         raise NovaCoreIngestionError("nova_core_invalid_" + field)
 
 
