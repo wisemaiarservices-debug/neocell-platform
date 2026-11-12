@@ -40,7 +40,8 @@ RFC3339_PATTERN = re.compile(
 
 
 def _required_string(value: Any, maximum: int, field: str) -> None:
-    if not isinstance(value, str) or not value.strip() or value.strip() != value or len(value) > maximum:
+    utf16_length = len(value.encode("utf-16-le", errors="surrogatepass")) // 2 if isinstance(value, str) else 0
+    if not isinstance(value, str) or not value.strip() or value.strip() != value or utf16_length > maximum:
         raise NovaCoreIngestionError("nova_core_invalid_" + field)
 
 
