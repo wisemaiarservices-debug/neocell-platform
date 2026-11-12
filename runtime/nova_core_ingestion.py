@@ -52,7 +52,8 @@ def _validate_observation_payload(payload: dict[str, Any]) -> None:
         _required_string(payload.get(field), {"site_id": 120, "source_id": 120, "idempotency_key": 200}[field], field)
     if payload.get("asset_id") is not None:
         _required_string(payload["asset_id"], 120, "asset_id")
-    if payload.get("module") != EXPECTED_MODULE or payload.get("module") not in MODULES:
+    module = payload.get("module")
+    if not isinstance(module, str) or module != EXPECTED_MODULE or module not in MODULES:
         raise NovaCoreIngestionError("nova_core_invalid_module")
     metric = payload.get("metric")
     if not isinstance(metric, str) or not METRIC_PATTERN.fullmatch(metric):
@@ -82,7 +83,8 @@ def _validate_observation_payload(payload: dict[str, Any]) -> None:
     if not isinstance(provenance, dict) or not set(provenance).issubset(PROVENANCE_KEYS):
         raise NovaCoreIngestionError("nova_core_invalid_provenance")
     _required_string(provenance.get("provider"), 120, "provenance_provider")
-    if provenance.get("acquisition_method") not in METHODS:
+    acquisition_method = provenance.get("acquisition_method")
+    if not isinstance(acquisition_method, str) or acquisition_method not in METHODS:
         raise NovaCoreIngestionError("nova_core_invalid_acquisition_method")
     if provenance.get("source_record_ref") is not None:
         _required_string(provenance["source_record_ref"], 240, "source_record_ref")
