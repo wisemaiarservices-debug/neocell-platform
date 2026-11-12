@@ -58,3 +58,8 @@ This is an early rejection layer, not an authorization or verification mechanism
 ## Forward compatibility: measurement quality and calibration v2
 
 NOVA Core has a design-only proposal for structured device, sampling, calibration-evidence, uncertainty, method/version and spatial-support metadata in `NOVA_CORE_MEASUREMENT_QUALITY_CALIBRATION_V2_PROPOSAL.md`. This proposal is not accepted by the current v1 endpoint. This adapter intentionally sends only the strict v1 envelope; do not add proposed fields or infer missing calibration/device metadata until a separately versioned Core endpoint and migration are approved and implemented. A successful v1 submission remains unverified and is not evidence of calibration or scientific eligibility.
+
+
+## Explicit activation gate
+
+The adapter requires `NOVA_CORE_INGESTION_ENABLED=true` in addition to valid server-side credentials and the exact HTTPS endpoint. The environment template defaults this flag to `false`; missing or false values fail closed before opening a network connection. Keep it disabled until Core identity, tenant/site/source grants, storage, live acceptance tests and monitoring have been independently approved. This flag does not itself authenticate a producer or verify measurements.
