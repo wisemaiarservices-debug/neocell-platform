@@ -2,7 +2,7 @@
 
 ## Status
 
-This is a transport helper and mock-transport test suite only. It is not called
+This is a strict NOVA Core v1 transport helper and contract-conformance test suite only. It is not called
 by the current NeoCell demo runtime and does not imply that device/gateway
 telemetry is connected.
 
@@ -15,7 +15,7 @@ telemetry is connected.
 - NOVA Core remains authoritative for Access JWT verification, service/module/
   source grants, payload validation, ownership, idempotency, audit records and
   server-assigned \`unverified\` status.
-- Synthetic demo values must never be forwarded as observations. The helper validates the strict Core v1 envelope and requires explicit opt-in; NOVA Core derives tenant ownership from registered site/source/asset records. The producer must not send a tenant ID.
+- Synthetic demo values must never be forwarded as observations. The adapter validates the Core v1 envelope, locks the module identity and requires explicit opt-in. NOVA Core derives tenant ownership from registered site/source/asset records; producers must never send `tenant_id`. The helper validates the strict Core v1 envelope and requires explicit opt-in; NOVA Core derives tenant ownership from registered site/source/asset records. The producer must not send a tenant ID.
 
 ## Server environment
 
