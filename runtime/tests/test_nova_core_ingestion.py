@@ -1,3 +1,5 @@
+import json
+import copy
 import sys
 import unittest
 from pathlib import Path
@@ -136,6 +138,40 @@ class NeoCellIngestionTests(unittest.TestCase):
         rejected = dict(self.payload, site_id="😀" * 61)
         with self.assertRaisesRegex(NovaCoreIngestionError, "invalid_site_id"):
             submit_observation(rejected, environ=self.env, connection_factory=FakeConnection)
+
+
+    def test_shared_nova_core_v1_contract_fixture_matrix(self):
+        fixture_path = Path(__file__).parent / "fixtures" / "nova-core-observation-v1.json"
+        fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+
+        def build_payload(case=None):
+            payload = copy.deepcopy(fixture["base_payload"])
+            payload["module"] = "neocell"
+            if case is not None:
+                path = case.get("path", case.get("delete"))
+                parent = payload
+                for key in path[:-1]:
+                    parent = parent[key]
+                if "delete" in case:
+                    del parent[path[-1]]
+                else:
+                    parent[path[-1]] = case["value"]
+            return payload
+
+        submit_observation(build_payload(), environ=self.env, connection_factory=FakeConnection)
+        for case in fixture["accepted"]:
+            with self.subTest(accepted=case["id"]):
+                FakeConnection.last = None
+                submit_observation(build_payload(case), environ=self.env, connection_factory=FakeConnection)
+                self.assertIsNotNone(FakeConnection.last)
+
+        for case in fixture["rejected"]:
+            with self.subTest(rejected=case["id"]):
+                FakeConnection.last = None
+                with self.assertRaises(NovaCoreIngestionError):
+                    submit_observation(build_payload(case), environ=self.env, connection_factory=FakeConnection)
+                self.assertIsNone(FakeConnection.last)
+
 
 
 if __name__ == "__main__":
