@@ -41,3 +41,15 @@ logging or returning upstream response bodies.
 
 Until those gates pass, this is an unconfigured integration foundation. No
 production behavior or public endpoint is changed.
+
+## Client-side envelope preflight
+
+The transport helper mirrors NOVA Core's current v1 observation envelope checks before opening a network connection:
+
+- Exact allowlisted top-level and provenance keys; required site, source and idempotency identifiers.
+- Module is fixed to this adapter's own module identifier.
+- Finite numeric value, bounded metric/unit strings and timezone-qualified RFC 3339 observation timestamp (not more than five minutes in the future).
+- Allowlisted acquisition method and quality flags; bounded provenance fields.
+- Bounded serialized request body; no credentials in the payload.
+
+This is an early rejection layer, not an authorization or verification mechanism. Core revalidates every request and alone assigns persistence and verification status. Keep this mirror aligned with apps/ingestion-worker/src/observation-contract.mjs in NOVA Core when the contract changes.
