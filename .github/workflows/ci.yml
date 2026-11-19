@@ -57,6 +57,9 @@ jobs:
       - name: Install
         working-directory: apps/web
         run: pnpm install
+      - name: Test provenance labels
+        working-directory: apps/web
+        run: pnpm run test
       - name: Typecheck
         working-directory: apps/web
         run: pnpm run typecheck
