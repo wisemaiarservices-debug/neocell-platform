@@ -46,8 +46,6 @@ jobs:
 
   web:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,18 +57,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Regenerate pnpm lockfile
+      - name: Install locked web dependencies
         working-directory: apps/web
-        run: pnpm install --no-frozen-lockfile
-      - name: Persist generated lockfile
-        run: |
-          git add apps/web/pnpm-lock.yaml
-          if ! git diff --cached --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "chore(neocell): add reproducible web dependency lockfile"
-            git push origin "HEAD:${{ github.head_ref || github.ref_name }}"
-          fi
+        run: pnpm install --frozen-lockfile
       - name: Test provenance labels
         working-directory: apps/web
         run: pnpm run test
