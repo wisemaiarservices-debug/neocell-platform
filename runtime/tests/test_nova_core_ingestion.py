@@ -46,6 +46,7 @@ class NeoCellIngestionTests(unittest.TestCase):
         self.env = {
             "NOVA_CORE_INGESTION_ENABLED": "true",
             "NOVA_CORE_INGESTION_URL": "https://ingest.example.com/api/v1/observations",
+            "NOVA_CORE_INGESTION_ALLOWED_HOST": "ingest.example.com",
             "NOVA_CORE_ACCESS_CLIENT_ID": "cell-client-id",
             "NOVA_CORE_ACCESS_CLIENT_SECRET": "cell-client-secret",
         }
@@ -118,6 +119,10 @@ class NeoCellIngestionTests(unittest.TestCase):
             "https://nova-core.example/other",
             "https://nova-core.example/api/v1/observations?x=1",
             "https://nova-core.example:99999/api/v1/observations",
+            "https://ingest.example.com:8443/api/v1/observations",
+            "https://other.example.com/api/v1/observations",
+            "https://ingest.example.com.workers.dev/api/v1/observations",
+            "https://ingest.example.com.vercel.app/api/v1/observations",
         ):
             with self.subTest(endpoint=endpoint), self.assertRaises(NovaCoreIngestionError):
                 submit_observation(self.payload, environ=dict(self.env, NOVA_CORE_INGESTION_URL=endpoint),
@@ -125,6 +130,13 @@ class NeoCellIngestionTests(unittest.TestCase):
         with self.assertRaisesRegex(NovaCoreIngestionError, "credentials_invalid"):
             submit_observation(self.payload, environ=dict(self.env, NOVA_CORE_ACCESS_CLIENT_ID="cell\r\nX: y"),
                                connection_factory=FakeConnection)
+
+    def test_rejects_missing_or_malformed_host_allowlist(self):
+        for allowed_host in ("", "bad..example.com", "-bad.example.com", "ingest.example.com/path"):
+            env = dict(self.env, NOVA_CORE_INGESTION_ALLOWED_HOST=allowed_host)
+            expected = "not_configured" if not allowed_host else "endpoint_invalid"
+            with self.subTest(allowed_host=allowed_host), self.assertRaisesRegex(NovaCoreIngestionError, expected):
+                submit_observation(self.payload, environ=env, connection_factory=FakeConnection)
 
     def test_rejected_request_does_not_echo_upstream_body(self):
         with self.assertRaises(NovaCoreIngestionError) as caught:
