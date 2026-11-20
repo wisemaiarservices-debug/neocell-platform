@@ -48,18 +48,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.7.0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install
+      - name: Install locked web dependencies
         working-directory: apps/web
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
+      - name: Test provenance labels
+        working-directory: apps/web
+        run: pnpm run test
       - name: Typecheck
         working-directory: apps/web
         run: pnpm run typecheck
+      - name: Audit production dependencies
+        working-directory: apps/web
+        run: pnpm audit --prod --audit-level high
+      - name: Audit full dependency tree
+        working-directory: apps/web
+        run: pnpm audit
       - name: Build
         working-directory: apps/web
         run: pnpm run build
