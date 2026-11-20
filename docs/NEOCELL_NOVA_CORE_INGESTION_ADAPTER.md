@@ -25,7 +25,7 @@ All credentials are blank in the example. Missing configuration or disabled opt-
 ## Activation gates
 
 1. Deploy the tenant-aware NOVA Core ingestion Worker only after account plan/quota review; keep `workers_dev=false` and `preview_urls=false`.
-2. Provision D1 and apply the ordered migrations `0001_initial.sql` through `0004_tenant_ownership_immutability.sql`; bind it as `DB`.
+2. Provision the D1 database for the private tenant API and bind it as `DB`. Use NOVA Core's canonical `apps/api/migrations/` directory and apply every SQL migration present there in filename order for the reviewed Core release (the current set extends through `0041`; numbering gaps are intentional). Do not stop at `0004` or apply only the initial tenant tables. Review the complete migration set against the exact Worker revision before any live application.
 3. Create a dedicated custom hostname and Cloudflare Access Service Auth policy restricted to the intended service identity.
 4. Register real NeoCell site, gateways, devices, cells and registered sensor sources; never reuse demo IDs.
 5. Configure exact service → module → source grants and store the service token only in the trusted backend runtime.
