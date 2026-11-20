@@ -38,3 +38,8 @@ Observe -> Analyze -> Forecast -> Recommend -> Simulate -> Optimize -> Measure I
 The current web UI is a scenario preview populated with deterministic synthetic fixtures. The browser optionally requests only the configured `/health` endpoint; a successful health response establishes process reachability only. It does not authenticate a tenant, consume site telemetry, verify sensors or gateways, validate safety/readiness, synchronize a Digital Twin, or prove provider connectivity. The dashboard values, sensor states, latency chart, readiness scores, and recommendations are illustrative and must not be treated as operational evidence.
 
 The OpenAPI document is a contract reference, not proof that routes are deployed, authenticated, tenant-isolated, or connected to physical infrastructure. Deployment plans, safety/compliance content, and recommendations are templates for review; no physical actuation, deployment execution, certification, or approval workflow is connected. No NOVA Core/private tenant-gateway integration is established by this UI.
+
+
+## Web dependency security baseline
+
+The NeoCell web preview uses Vite `8.3.8`, React/React DOM `19.2.x`, Node.js `>=20.19.0`, and a committed pnpm lockfile generated with pnpm `11.7.0`. CI installs with `pnpm install --frozen-lockfile`, runs provenance tests, TypeScript, production/full dependency audits, and the production build. Both audits reported no known vulnerabilities on the regenerated dependency graph; final exact-head frozen-lockfile CI is the remaining check. This is preview-branch evidence, not production deployment evidence.
